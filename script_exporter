@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import os
+import sys
+import subprocess
+import time
+import argparse
+import yaml
+import traceback
+import shlex
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+##################################################################################################
+class exporter_handler(BaseHTTPRequestHandler):
+
+    global home_dir
+
+    def __init__(self, configuration):
+        self.configuration = configuration
+
+    def __call__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def do_GET(self):
+        """ """
+
+        text_to_return = ""
+        
+        # dispatch the request according to the requested path:
+        if self.path.find("/probe?job=") == 0:
+            run_results_requested_jobs = []
+            requested_jobs = self.fetch_requested_jobs(self.path, 'job')
+
+            if requested_jobs["processing_result"]:
+                for job in requested_jobs["jobs_config"]:
+                    run_results_requested_jobs.append(self.run_job(job))
+
+                # populate the text before outputting it:
+                text_to_return = self.populate_response(run_results_requested_jobs)
+
+        if self.path.find("/probe?group=") == 0:
+            pass
+
+        elif self.path == "/dump-config":
+            pass
+
+        # print output to user:
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+
+        for text_line in text_to_return:
+            self.wfile.write(bytes(text_line, "utf-8"))
+        
+    def fetch_requested_jobs(self, uri_path, entity_type):
+        """ """
+
+        job_name = uri_path.split("/probe?job=")[1]
+
+        if entity_type == 'job':
+            if job_name == "all":
+                jobs_config = [job for job in self.configuration["jobs"] if job["status"] == "enabled"]
+                return {"processing_result": True, "jobs_config": jobs_config}
+
+            else:
+                jobs_config = [job for job in self.configuration["jobs"] if job["name"] == job_name]
+                if len(jobs_config) == 0:
+                    print("ERROR: job not found: {}".format(job_name))
+                    return {"processing_result": False}
+
+                elif len(jobs_config) == 1:
+                    if jobs_config[0]["status"] == "enabled":
+                        return {"processing_result": True, "jobs_config": [jobs_config[0]]}
+
+                    else:
+                        print("ERROR: job is not enabled: {}".format(job_name))
+                        return {"processing_result": False}
+
+                else:
+                    print("ERROR: more than one jobs were found with name: {}".format(job_name))
+                    return {"processing_result": False}
+
+        elif entity_type == 'group':
+            pass
+
+    def run_job(self, job_config):
+        """ """
+        
+        try:
+            os_command = home_dir + "/scripts/" + job_config["script"]
+            if type(job_config["params"]) is list:
+                for param in job_config["params"]:
+                    os_command = os_command + " " + str(param)
+
+            os_command_args = shlex.split(os_command)
+            os_process = subprocess.Popen(os_command_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            cmd_output, cmd_error = os_process.communicate()
+
+            if os_process.returncode != 0:
+                return {"processing_result": False, "job": job_config["name"], "error": "exit code was: {}".format(os_process.returncode), "exit_code": os_process.returncode, "stdout": cmd_output.decode("utf-8"), "stderr": cmd_error.decode("utf-8")}
+
+            else:
+                return {"processing_result": True, "job": job_config["name"], "exit_code": 0, "stdout": cmd_output.decode("utf-8"), "stderr": cmd_error.decode("utf-8")}
+
+        except Exception as e:
+            return {"processing_result": False, "job": job_config["name"], "error": traceback.format_exc()}
+
+    def populate_response(self, run_results):
+        """ """
+        populated_text = ""
+        for result in run_results:
+            populated_text = populated_text + """# HELP script_exporter_script_success: script's exit status (0=error, 1=success).
+# TYPE script_exporter_script_success gauge""" + "\n"
+            if result["exit_code"] == 0:
+                populated_text = populated_text + 'script_exporter_script_success{script="%s"} 1' % result["job"] + "\n"
+
+            else:
+                populated_text = populated_text + 'script_exporter_script_success{script="%s"} 0' % result["job"] + "\n"
+
+            if result["exit_code"] == 0:
+                # check if single line output and strip the EOL, then check if is numeric:
+                if len(result["stdout"].split("\n")) == 2:
+                    try:
+                        output = result["stdout"].replace("\n", "")
+                        if round(float(output), 0) == float(output):
+                            populated_text = populated_text + 'script_exporter_script_output{script="%s"} %s' % (result["job"], output) + "\n"
+                        else:
+                            populated_text = populated_text + 'script_exporter_script_output{script="%s"} %.2f' % (result["job"], float(output)) + "\n"
+
+                    except Exception as e:
+                        print("ERROR: job: {} returned non-numeric stdout. Not printing it.".format(result["job"]))
+                        print(traceback.format_exc())
+
+                else:
+                    print("ERROR: job: {} returned multi-line stdout. Not printing it.".format(result["job"]))
+
+        return populated_text
+
+##################################################################################################
+def main():
+
+    global home_dir
+
+    # initializing params:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--listen-ip', help='the IP interface to listen on', type=str, dest="listening_ip", required=False, default="0.0.0.0")
+    parser.add_argument('--listen-port', help='the port to listen on', type=int, dest="listening_port", required=False, default="8103")
+    parser.add_argument('--config', help='the config file', type=str, dest="config_file", required=False, default="script_exporter.yml")
+    args = parser.parse_args()
+    listening_ip = args.listening_ip
+    listening_port = args.listening_port
+    config_file = args.config_file
+
+    # parse the config file:
+    home_dir = os.path.abspath(os.path.dirname(__file__))
+    
+    try:
+        with open(home_dir + "/" + config_file, "r") as f:
+            config_file_contents = f.read()
+            f.close()
+        
+        script_exporter_configuration = yaml.safe_load(config_file_contents)
+
+    except Exception as e:
+        print("ERROR: Could not parse the config file, exception details:\n {}\nExiting ..".format(traceback.format_exc()))
+        sys.exit(1)
+
+    # start the server:
+    http_handler = exporter_handler(script_exporter_configuration)
+    script_exporter = HTTPServer((listening_ip, listening_port), http_handler)
+    print("INFO: script_exporter started at http://{}:{}".format(listening_ip, listening_port))
+
+    try:
+        script_exporter.serve_forever()
+    except Exception as e:
+        pass
+
+    script_exporter.server_close()
+    print("INFO: script_exporter stopped.")
+
+##################################################################################################
+# python3 check:
+if sys.version_info.major < 3:
+    print("ERROR: This script requires Python 3. Exiting..")
+    sys.exit(0)
+
+# start:
+if __name__ == "__main__":
+    main()

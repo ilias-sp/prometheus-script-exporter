@@ -127,3 +127,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# repo-specific files below:
+
+TEMP*
+temp*
+script_exporter.service
+script_exporter.yml

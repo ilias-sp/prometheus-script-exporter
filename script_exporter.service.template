@@ -1,0 +1,15 @@
+[Unit]
+Description=Prometheus script_exporter
+Documentation=https://github.com/ilias-sp/prometheus-script_exporter
+After=network.target
+
+[Service]
+User=<define the user to run the exporter>
+WorkingDirectory=<define the dir the exporter was installed>
+ExecStartPre=-/sbin/iptables -A INPUT -p tcp --dport <port to listen> -j ACCEPT
+ExecStart=<define the dir the exporter was installed>/script_exporter --listen-port <port to listen>
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

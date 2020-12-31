@@ -1,0 +1,24 @@
+---
+jobs:
+- name: echo_argument
+  description: dummy script to echo something on stdout, for testing purposes
+  script: echo_argument.sh
+  params: 
+  - 123
+  status: disabled
+- name: return_failure
+  description: test script to produce a non-zero exit code
+  script: return_failure.sh
+  params: 
+  status: disabled
+- name: check_apache_running
+  description: check if apache server is running
+  script: check_process_running.sh
+  params:
+  - apache2
+  status: enabled
+- name: check_cpu_temperature
+  description: requires lm-sensors, tested on ubuntu
+  script: check_cpu_temperature.sh
+  params:
+  status: enabled
