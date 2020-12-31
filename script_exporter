@@ -39,10 +39,10 @@ class exporter_handler(BaseHTTPRequestHandler):
                 # populate the text before outputting it:
                 text_to_return = self.populate_response(run_results_requested_jobs)
 
-        if self.path.find("/probe?group=") == 0:
+        elif self.path.find("/probe?group=") == 0:
             pass
 
-        elif self.path == "/dump-config":
+        elif self.path == "/show-config":
             pass
 
         # print output to user:
@@ -56,17 +56,21 @@ class exporter_handler(BaseHTTPRequestHandler):
     def fetch_requested_jobs(self, uri_path, entity_type):
         """ """
 
-        job_name = uri_path.split("/probe?job=")[1]
-
         if entity_type == 'job':
-            if job_name == "all":
+            job_name = uri_path.split("/probe?job=")[1]
+
+            if job_name == "":
+                print("ERROR: job not provided.")
+                return {"processing_result": False}
+
+            elif job_name == "all":
                 jobs_config = [job for job in self.configuration["jobs"] if job["status"] == "enabled"]
                 return {"processing_result": True, "jobs_config": jobs_config}
 
             else:
                 jobs_config = [job for job in self.configuration["jobs"] if job["name"] == job_name]
                 if len(jobs_config) == 0:
-                    print("ERROR: job not found: {}".format(job_name))
+                    print("ERROR: job {} not found".format(job_name))
                     return {"processing_result": False}
 
                 elif len(jobs_config) == 1:
@@ -74,11 +78,11 @@ class exporter_handler(BaseHTTPRequestHandler):
                         return {"processing_result": True, "jobs_config": [jobs_config[0]]}
 
                     else:
-                        print("ERROR: job is not enabled: {}".format(job_name))
+                        print("ERROR: job {} is not enabled".format(job_name))
                         return {"processing_result": False}
 
                 else:
-                    print("ERROR: more than one jobs were found with name: {}".format(job_name))
+                    print("ERROR: more than one jobs were found with name {}".format(job_name))
                     return {"processing_result": False}
 
         elif entity_type == 'group':
@@ -129,11 +133,11 @@ class exporter_handler(BaseHTTPRequestHandler):
                             populated_text = populated_text + 'script_exporter_script_output{script="%s"} %.2f' % (result["job"], float(output)) + "\n"
 
                     except Exception as e:
-                        print("ERROR: job: {} returned non-numeric stdout. Not printing it.".format(result["job"]))
+                        print("ERROR: job {} returned non-numeric stdout. Not printing it.".format(result["job"]))
                         print(traceback.format_exc())
 
                 else:
-                    print("ERROR: job: {} returned multi-line stdout. Not printing it.".format(result["job"]))
+                    print("ERROR: job {} returned multi-line stdout. Not printing it.".format(result["job"]))
 
         return populated_text
 
@@ -173,7 +177,7 @@ def main():
 
     try:
         script_exporter.serve_forever()
-    except Exception as e:
+    except:
         pass
 
     script_exporter.server_close()
