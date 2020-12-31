@@ -6,7 +6,7 @@ The shell scripts will be referred to as "jobs" in this guide.
 
 ## > Prerequisites
 
-The exporter is written in Python, and uses several Python packages. you can download manually or use the `requirements.txt` provided in the repo. To install them:
+The exporter is written in Python, and uses several Python packages. You can download manually, or use the `requirements.txt` provided in the repo to install them:
 
 ```
 python3 -m pip install -r requirements.txt
