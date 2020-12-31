@@ -105,6 +105,14 @@ script_exporter_script_output{script="check_cpu_temperature"} 44.30
 [ilias@pi4 system] > 
 ```
 
+## > Requirements for the shell scripts
+
+When writing shell scripts to consume with the script_exporter, some rules need to be taken care of:
+
+1. The script will return only numeric values, for example: 23, -34, 44.221, etc
+2. The output should be a single line.
+3. If the exit code of the script is non-zero, then script_exporter will not print the `script_exporter_script_output` metric for that job, as it is considered a failed run.
+
 ## > Issues
 
 Feel free to open an issue for questions of if something seems off.
