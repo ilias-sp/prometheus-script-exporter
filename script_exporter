@@ -40,10 +40,18 @@ class exporter_handler(BaseHTTPRequestHandler):
                 text_to_return = self.populate_response(run_results_requested_jobs)
 
         elif self.path.find("/probe?group=") == 0:
-            pass
+            run_results_requested_jobs = []
+            requested_jobs = self.fetch_requested_jobs(self.path, 'group')
+
+            if requested_jobs["processing_result"]:
+                for job in requested_jobs["jobs_config"]:
+                    run_results_requested_jobs.append(self.run_job(job))
+
+                # populate the text before outputting it:
+                text_to_return = self.populate_response(run_results_requested_jobs)
 
         elif self.path == "/show-config":
-            pass
+            text_to_return = yaml.dump(self.configuration, allow_unicode=True)
 
         # print output to user:
         self.send_response(200)
@@ -56,11 +64,11 @@ class exporter_handler(BaseHTTPRequestHandler):
     def fetch_requested_jobs(self, uri_path, entity_type):
         """ """
 
-        if entity_type == 'job':
+        if entity_type == "job":
             job_name = uri_path.split("/probe?job=")[1]
 
             if job_name == "":
-                print("ERROR: job not provided.")
+                print("ERROR: job was not provided.")
                 return {"processing_result": False}
 
             elif job_name == "all":
@@ -85,8 +93,21 @@ class exporter_handler(BaseHTTPRequestHandler):
                     print("ERROR: more than one jobs were found with name {}".format(job_name))
                     return {"processing_result": False}
 
-        elif entity_type == 'group':
-            pass
+        elif entity_type == "group":
+            group_name = uri_path.split("/probe?group=")[1]
+
+            if group_name == "":
+                print("ERROR: group was not provided.")
+                return {"processing_result": False}
+
+            else:
+                jobs_config = [job for job in self.configuration["jobs"] if job["status"] == "enabled" and job["group"] == group_name]
+                if len(jobs_config) == 0:
+                    print("ERROR: no enabled jobs found for group {}".format(group_name))
+                    return {"processing_result": False}
+
+                else:
+                    return {"processing_result": True, "jobs_config": jobs_config}
 
     def run_job(self, job_config):
         """ """

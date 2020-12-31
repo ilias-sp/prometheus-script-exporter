@@ -75,14 +75,36 @@ systemctl start script_exporter
 ...
 ```
 
+Please note that with the above example, Prometheus will probe for `job=all`. To trigger all jobs belonging to a group called "network" we should define:
+
+```
+    params:
+      group: [network]
+```
+
 ## > Testing the script_exporter
 
-To test that the exporter produces the metrics, you can scrape it by accessing its service url and the job you wish to trigger. Sample output can be seen below:
+To test that the exporter produces the metrics, you can scrape it by accessing its probe URL along with the job or group of jobs you wish to trigger. Example URLs:
+
+```
+http://<ip>:<port>/probe?job=check_cpu_temperature
+http://<ip>:<port>/probe?job=all
+http://<ip>:<port>/probe?group=network
+http://<ip>:<port>/probe?group=os
+```
+
+To make the exporter dump the current job config, use URL:
+
+```
+http://<ip>:<port>/show-config
+```
+
+Sample outputs can be seen below:
 
 - probing for a specific job:
 
 ```
-[ilias@pi4 system] > curl http://127.0.0.1:8103/probe?job=check_cpu_temperature          
+[ilias@pi4 system] > curl http://127.0.0.1:8103/probe?job=check_cpu_temperature
 # HELP script_exporter_script_success Script exit status (0 = error, 1 = success).
 # TYPE script_exporter_script_success gauge
 script_exporter_script_success{script="check_cpu_temperature"} 1
@@ -102,6 +124,54 @@ script_exporter_script_output{script="check_lan_hosts"} 5
 # TYPE script_exporter_script_success gauge
 script_exporter_script_success{script="check_cpu_temperature"} 1
 script_exporter_script_output{script="check_cpu_temperature"} 44.30
+[ilias@pi4 system] > 
+```
+
+- probing all jobs belonging to a group called "os":
+
+```
+[ilias@pi4 system] > curl http://127.0.0.1:8103/probe?group=os
+# HELP script_exporter_script_success: script's exit status (0=error, 1=success).
+# TYPE script_exporter_script_success gauge
+script_exporter_script_success{script="check_apache_running"} 1
+script_exporter_script_output{script="check_apache_running"} 11
+# HELP script_exporter_script_success: script's exit status (0=error, 1=success).
+# TYPE script_exporter_script_success gauge
+script_exporter_script_success{script="check_cpu_temperature"} 1
+[ilias@pi4 system] > 
+```
+
+- dumping current jobs config: 
+
+```
+[ilias@pi4 system] > curl http://127.0.0.1:8103/show-config        
+jobs:
+- description: dummy script to echo something on stdout, for testing purposes
+  group: testing
+  name: echo_argument
+  params:
+  - 123
+  script: echo_argument.sh
+  status: disabled
+- description: test script to produce a non-zero exit code
+  group: testing
+  name: return_failure
+  params: null
+  script: return_failure.sh
+  status: disabled
+- description: check if apache server is running
+  group: os
+  name: check_apache_running
+  params:
+  - httpd
+  script: check_process_running.sh
+  status: enabled
+- description: requires lm-sensors, tested on ubuntu
+  group: os
+  name: check_cpu_temperature
+  params: null
+  script: check_cpu_temperature.sh
+  status: enabled
 [ilias@pi4 system] > 
 ```
 

@@ -6,19 +6,23 @@ jobs:
   params: 
   - 123
   status: disabled
+  group: testing
 - name: return_failure
   description: test script to produce a non-zero exit code
   script: return_failure.sh
   params: 
   status: disabled
+  group: testing
 - name: check_apache_running
   description: check if apache server is running
   script: check_process_running.sh
   params:
   - apache2
   status: enabled
+  group: os
 - name: check_cpu_temperature
   description: requires lm-sensors, tested on ubuntu
   script: check_cpu_temperature.sh
   params:
   status: enabled
+  group: os
