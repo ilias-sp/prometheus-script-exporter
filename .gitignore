@@ -134,3 +134,4 @@ TEMP*
 temp*
 script_exporter.service
 script_exporter.yml
+scripts/*.sh
