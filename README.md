@@ -185,4 +185,4 @@ When writing shell scripts to consume with the script_exporter, some rules need 
 
 ## > Issues
 
-Feel free to open an issue for questions or if something seems off.
+Feel free to [open an issue](https://github.com/ilias-sp/prometheus-script-exporter/issues/new/choose) for questions or if something seems off.
